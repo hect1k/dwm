@@ -3,8 +3,16 @@
 /* appearance */
 static const unsigned int borderpx = 3; /* border pixel of windows */
 static const unsigned int snap = 32;    /* snap pixel */
-static const int showbar = 1;           /* 0 means no bar */
-static const int topbar = 1;            /* 0 means bottom bar */
+static const unsigned int gappih = 10;  /* horiz inner gap between windows */
+static const unsigned int gappiv = 10;  /* vert inner gap between windows */
+static const unsigned int gappoh =
+    10; /* horiz outer gap between windows and screen edge */
+static const unsigned int gappov =
+    10; /* vert outer gap between windows and screen edge */
+static int smartgaps =
+    0; /* 1 means no outer gap when there is only one window */
+static const int showbar = 1; /* 0 means no bar */
+static const int topbar = 1;  /* 0 means bottom bar */
 static const char *fonts[] = {"JetBrainsMono Nerd Font:size=12",
                               "JoyPixels:size=12:antialias=true:autohint:true"};
 static const char dmenufont[] = "JetBrainsMono Nerd Font:size=12";
@@ -35,14 +43,32 @@ static const Rule rules[] = {
 /* layout(s) */
 static const float mfact = 0.55; /* factor of master area size [0.05..0.95] */
 static const int nmaster = 1;    /* number of clients in master area */
-static const int resizehints = 1; /* 1 means respect size hints in tiled resizals */
-static const int lockfullscreen = 0; /* 1 will force focus on the fullscreen window */
+static const int resizehints =
+    1; /* 1 means respect size hints in tiled resizals */
+static const int lockfullscreen =
+    1; /* 1 will force focus on the fullscreen window */
+
+#define FORCE_VSPLIT                                                           \
+  1 /* nrowgrid layout: force two clients to always split vertically */
+#include "vanitygaps.c"
 
 static const Layout layouts[] = {
     /* symbol     arrange function */
     {"[]=", tile}, /* first entry is default */
     {"><>", NULL}, /* no layout function means floating behavior */
     {"[M]", monocle},
+    {"[@]", dwindle},
+    {"[\\]", spiral},
+    {"H[]", deck},
+    {"TTT", bstack},
+    {"===", bstackhoriz},
+    {"HHH", grid},
+    {"###", nrowgrid},
+    {"---", horizgrid},
+    {":::", gaplessgrid},
+    {"|M|", centeredmaster},
+    {">M>", centeredfloatingmaster},
+    {NULL, NULL},
 };
 
 /* key definitions */
@@ -80,14 +106,37 @@ static const Key keys[] = {
     {MODKEY, XK_r, incnmaster, {.i = -1}},
     {MODKEY, XK_h, setmfact, {.f = -0.05}},
     {MODKEY, XK_l, setmfact, {.f = +0.05}},
+    {MODKEY | ShiftMask, XK_h, setcfact, {.f = +0.25}},
+    {MODKEY | ShiftMask, XK_l, setcfact, {.f = -0.25}},
+    {MODKEY | ShiftMask, XK_o, setcfact, {.f = 0.00}},
     {MODKEY | ShiftMask, XK_j, movestack, {.i = +1}},
     {MODKEY | ShiftMask, XK_k, movestack, {.i = -1}},
     {MODKEY | ShiftMask, XK_Return, zoom, {0}},
     {MODKEY | ShiftMask, XK_Tab, view, {0}},
+    {MODKEY | Mod1Mask, XK_u, incrgaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_u, incrgaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_i, incrigaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_i, incrigaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_o, incrogaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_o, incrogaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_6, incrihgaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_6, incrihgaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_7, incrivgaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_7, incrivgaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_8, incrohgaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_8, incrohgaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_9, incrovgaps, {.i = +1}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_9, incrovgaps, {.i = -1}},
+    {MODKEY | Mod1Mask, XK_0, togglegaps, {0}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_0, defaultgaps, {0}},
     {MODKEY, XK_q, killclient, {0}},
     {MODKEY, XK_t, setlayout, {.v = &layouts[0]}},
     {MODKEY, XK_f, setlayout, {.v = &layouts[1]}},
     {MODKEY, XK_m, setlayout, {.v = &layouts[2]}},
+    {MODKEY, XK_w, setlayout, {.v = &layouts[3]}},
+    {MODKEY, XK_s, setlayout, {.v = &layouts[5]}},
+    {MODKEY, XK_x, setlayout, {.v = &layouts[11]}},
+    {MODKEY, XK_e, setlayout, {.v = &layouts[12]}},
     {MODKEY | ShiftMask, XK_f, fullscreen, {0}},
     {MODKEY, XK_space, setlayout, {0}},
     {MODKEY | ShiftMask, XK_space, togglefloating, {0}},
@@ -132,7 +181,7 @@ static const Key keys[] = {
     {0, XF86XK_TouchpadToggle, spawn, SHCMD("~/.local/bin/toggletouchpad")},
     {MODKEY, XK_b, spawn, SHCMD("$BROWSER")},
     {MODKEY | ShiftMask, XK_b, spawn, SHCMD("chromium")},
-    {MODKEY | ShiftMask, XK_l, spawn, SHCMD("slock")},
+    {MODKEY | Mod1Mask, XK_l, spawn, SHCMD("slock")},
     {MODKEY | ShiftMask, XK_c, spawn, SHCMD("~/.local/bin/color-picker")},
     {MODKEY | ShiftMask, XK_e, spawn, SHCMD("~/.local/bin/emoji")},
     {MODKEY, XK_Print, spawn, SHCMD("~/.local/bin/ss")},
